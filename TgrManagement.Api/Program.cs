@@ -1,41 +1,45 @@
+using TgrManagement.Api.Endpoints;
+using TgrManagement.Api.Services;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+// ====== Services =====
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(config =>
+    {
+        config.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+    });
+});
+
 builder.Services.AddOpenApi();
+
+builder.Services.AddHttpClient<ITgrCentralService, TgrCentralService>(client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["TgrApi:BaseAddress"]!); 
+    client.DefaultRequestHeaders.Add("Accept", "application/json");
+    client.Timeout = TimeSpan.FromSeconds(90); 
+});
+
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+//====== Middleware =====
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("../openapi/v1.json", "TGR-1 SOL Api");
+    c.RoutePrefix = "swagger";
+});
 }
-
 app.UseHttpsRedirection();
+app.UseCors();
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
+#region Endpoints Configuration
+app.MapGroup("/api/listas").MapLists();
+app.MapGroup("/api/recibos").MapReceipts();
+#endregion Endpoints Configuration
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
